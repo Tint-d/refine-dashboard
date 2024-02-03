@@ -1,79 +1,178 @@
-import { GitHubBanner, Refine, WelcomePage } from "@refinedev/core";
-import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
-import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
-
-import { notificationProvider, RefineThemes } from "@refinedev/mantine";
-
+import { useState } from "react";
+import { Authenticated, GitHubBanner, Refine } from "@refinedev/core";
 import {
+  ThemedLayoutV2,
+  ErrorComponent,
+  AuthPage,
+  RefineThemes,
+} from "@refinedev/mantine";
+import { NotificationsProvider } from "@mantine/notifications";
+import {
+  MantineProvider,
+  Global,
   ColorScheme,
   ColorSchemeProvider,
-  Global,
-  MantineProvider,
 } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
-import { NotificationsProvider } from "@mantine/notifications";
-import routerBindings, {
-  DocumentTitleHandler,
-  UnsavedChangesNotifier,
-} from "@refinedev/react-router-v6";
 import dataProvider from "@refinedev/simple-rest";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import routerProvider, {
+  NavigateToResource,
+  CatchAllNavigate,
+  UnsavedChangesNotifier,
+  DocumentTitleHandler,
+} from "@refinedev/react-router-v6";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { IconBrandGoogle, IconBrandGithub } from "@tabler/icons";
+import ThemeSettings from "./components/theme-setting";
+import DashboardPage from "./pages/dashboard";
+import { PostList } from "./pages/posts/list";
+import { PostCreate } from "./pages/posts/create";
+import { PostEdit } from "./pages/posts/edit";
+import { PostShow } from "./pages/posts/show";
 
-function App() {
-  const [colorScheme, setColorScheme] = useLocalStorage<ColorScheme>({
-    key: "mantine-color-scheme",
-    defaultValue: "light",
-    getInitialValueInEffect: true,
-  });
+
+const App: React.FC = () => {
+  const [colorScheme, setColorScheme] = useState<ColorScheme>("dark");
+  const [customTheme, setCustomTheme] = useState(RefineThemes.Blue);
+  console.log(customTheme);
+  
 
   const toggleColorScheme = (value?: ColorScheme) =>
     setColorScheme(value || (colorScheme === "dark" ? "light" : "dark"));
 
   return (
     <BrowserRouter>
-      <GitHubBanner />
-      <RefineKbarProvider>
-        <ColorSchemeProvider
-          colorScheme={colorScheme}
-          toggleColorScheme={toggleColorScheme}
+      <ColorSchemeProvider
+        colorScheme={colorScheme}
+        toggleColorScheme={toggleColorScheme}
+      >
+        <MantineProvider
+          theme={{
+            colorScheme: colorScheme,
+            ...customTheme,
+          }}
+          withNormalizeCSS
+          withGlobalStyles
         >
-          {/* You can change the theme colors here. example: theme={{ ...RefineThemes.Magenta, colorScheme:colorScheme }} */}
-          <MantineProvider
-            theme={{ ...RefineThemes.Blue, colorScheme: colorScheme }}
-            withNormalizeCSS
-            withGlobalStyles
-          >
-            <Global styles={{ body: { WebkitFontSmoothing: "auto" } }} />
-            <NotificationsProvider position="top-right">
-              <DevtoolsProvider>
-                <Refine
-                  notificationProvider={notificationProvider}
-                  routerProvider={routerBindings}
-                  dataProvider={dataProvider(
-                    "https://api.fake-rest.refine.dev"
-                  )}
-                  options={{
-                    syncWithLocation: true,
-                    warnWhenUnsavedChanges: true,
-                    useNewQueryKeys: true,
-                    projectId: "LH3Kaw-btkFx0-9uZpWa",
-                  }}
+          <Global styles={{ body: { WebkitFontSmoothing: "auto" } }} />
+          <ThemeSettings onThemeClick={(theme) => setCustomTheme(theme)} />
+          <NotificationsProvider position="top-right">
+            <Refine
+              routerProvider={routerProvider}
+              dataProvider={dataProvider("https://api.fake-rest.refine.dev")}
+              resources={[
+                {
+                  name: "posts",
+                  list: "/posts",
+                  show: "/posts/show/:id",
+                  create: "/posts/create",
+                  edit: "/posts/edit/:id",
+                },
+              ]}
+              options={{
+                syncWithLocation: true,
+                warnWhenUnsavedChanges: true,
+              }}
+            >
+              <Routes>
+                <Route
+                  element={
+                    <Authenticated
+                      key="authenticated-routes"
+                      fallback={<CatchAllNavigate to="/login" />}
+                    >
+                      <ThemedLayoutV2>
+                        <Outlet />
+                      </ThemedLayoutV2>
+                    </Authenticated>
+                  }
                 >
-                  <Routes>
-                    <Route index element={<WelcomePage />} />
-                  </Routes>
-                  <RefineKbar />
-                  <UnsavedChangesNotifier />
-                  <DocumentTitleHandler />
-                </Refine>
-                <DevtoolsPanel />
-              </DevtoolsProvider>
-            </NotificationsProvider>
-          </MantineProvider>
-        </ColorSchemeProvider>
-      </RefineKbarProvider>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+
+                  <Route path="/posts">
+                    <Route index element={<PostList />} />
+                    <Route path="create" element={<PostCreate />} />
+                    <Route path="edit/:id" element={<PostEdit />} />
+                    <Route path="show/:id" element={<PostShow />} />
+                  </Route>
+                </Route>
+
+                <Route
+                  element={
+                    <Authenticated key="auth-pages" fallback={<Outlet />}>
+                      <NavigateToResource resource="posts" />
+                    </Authenticated>
+                  }
+                >
+                  <Route
+                    path="/login"
+                    element={
+                      <AuthPage
+                        type="login"
+                        providers={[
+                          {
+                            name: "google",
+                            label: "Sign in with Google",
+                            icon: <IconBrandGoogle size="16px" />,
+                          },
+                          {
+                            name: "github",
+                            label: "Sign in with GitHub",
+                            icon: <IconBrandGithub size="16px" />,
+                          },
+                        ]}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/register"
+                    element={
+                      <AuthPage
+                        type="register"
+                        providers={[
+                          {
+                            name: "google",
+                            label: "Sign in with Google",
+                            icon: <IconBrandGoogle size="16px" />,
+                          },
+                          {
+                            name: "github",
+                            label: "Sign in with GitHub",
+                            icon: <IconBrandGithub size="16px" />,
+                          },
+                        ]}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/forgot-password"
+                    element={<AuthPage type="forgotPassword" />}
+                  />
+                  <Route
+                    path="/update-password"
+                    element={<AuthPage type="updatePassword" />}
+                  />
+                </Route>
+
+                <Route
+                  element={
+                    <Authenticated key="catch-all">
+                      <ThemedLayoutV2>
+                        <Outlet />
+                      </ThemedLayoutV2>
+                    </Authenticated>
+                  }
+                >
+                  <Route path="*" element={<ErrorComponent />} />
+                </Route>
+              </Routes>
+              <UnsavedChangesNotifier />
+              <DocumentTitleHandler />
+            </Refine>
+          </NotificationsProvider>
+        </MantineProvider>
+      </ColorSchemeProvider>
     </BrowserRouter>
   );
-}
+};
 
 export default App;
